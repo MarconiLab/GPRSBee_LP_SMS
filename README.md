@@ -1,5 +1,5 @@
 #GPRSBee_LP_SMS
-==============
+
 This code send SMS text with RTC temperature value using GPRSBee. Low power is implemented every SLPNG seconds.
 
 ##Libraries

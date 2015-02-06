@@ -1,3 +1,21 @@
+/*Send SMS every SLPNG seconds and go to sleep.
+  SMS is RTC temperature
+  Stalker + GPRSBee
+  To program unconnect pin0 and 1 or take gprsbee out. (sharing ports 0 and 1 from Stalker)
+  Jumper INT PD2 welded in Stalker to Use Interruption with RTC
+  Cable CTS and PWRPin from GPRSBee to Stalker In pins
+  GPRSBEE_PWRPIN (Stalker) <--> pin#9 (GPRSBee)
+  XBEECTS_PIN    (Stalker) <--> pin#12 (GPRSBee)
+  Port0 (Stalker) <--> pin#1 (GPRSBee) Tx
+  Port1 (Stalker) <--> pin#2 (GPRSBee) Rx
+  BEE_PWRPIN      5    //if PD5-En jumper welded in Stalker to swtich on and off bee power
+  To read from serial Diag.h enable_diag in 1 and defined otherwise #undef
+  #define ENABLE_DIAG     1
+  UartSBee Gnd <--> Gnd Stalker
+  UartSBee Rx <--> DIAGPORT_TX Stalker
+  UartSBee TX <--> DIAGPORT_RX Stalker
+  */
+
 #include <avr/sleep.h>
 #include <avr/power.h>
 #include <Wire.h>
@@ -8,14 +26,14 @@
 #include <String.h>
 
 //sleeping time
-#define SLPNG           60
-#define BEE_PWRPIN      5
-#define GPRSBEE_PWRPIN  7
-#define XBEECTS_PIN     8
-#define DIAGPORT_RX     4
-#define DIAGPORT_TX     3
+#define SLPNG           60   //seconds
+#define BEE_PWRPIN      5    //if PD5-En jumper welded in Stalker
+#define GPRSBEE_PWRPIN  7    //pin#9 GPRS
+#define XBEECTS_PIN     8    //pin#12 GPRS
+#define DIAGPORT_RX     4    //GPRS Diag port view Diag.h
+#define DIAGPORT_TX     3    //GPRS Diag port
 
-//#########       diag      #############
+///#########       diag      #############
 #ifdef ENABLE_DIAG
 #if defined(UBRRH) || defined(UBRR0H)
 // There probably is no other Serial port that we can use
@@ -70,8 +88,8 @@ unsigned char read_charge_status(void)
 {
   unsigned char CH_Status=0;
   unsigned int ADC6=analogRead(6);
-  if(ADC6>900)  
-   {CH_Status = 0;}//sleeping 
+  if(ADC6>900)
+   {CH_Status = 0;}//sleeping
   else if(ADC6>550)
    {CH_Status = 1;}//charging
   else if(ADC6>350)
@@ -85,16 +103,17 @@ unsigned char read_charge_status(void)
 
 void setup () 
 {
-     pinMode(BEE_PWRPIN,OUTPUT);    //extern GPRS power 
-     digitalWrite(BEE_PWRPIN,HIGH);     
+     pinMode(BEE_PWRPIN,OUTPUT);    //extern Bee port power 
+     digitalWrite(BEE_PWRPIN,HIGH); //turn on Bee port   
+     
      Serial.begin(9600);      // Serial1 is connected to SIM900 GPRSbee
      gprsbee.init(Serial, XBEECTS_PIN, GPRSBEE_PWRPIN);
      gprsbee.off();
-    #ifdef ENABLE_DIAG
-     diagport.begin(9600);
-     gprsbee.setDiag(diagport);
-    #endif
-     
+     #ifdef ENABLE_DIAG
+      diagport.begin(9600);
+      gprsbee.setDiag(diagport);
+     #endif
+
     /*Initialize INT0 pin for accepting interrupts */
      PORTD |= 0x04; 
      DDRD &=~ 0x04;
@@ -111,9 +130,7 @@ void setup ()
      DateTime start = RTC.now();
      interruptTime = DateTime(start.get() + SLPNG); //Add SPLNG seconds in seconds to start time
      analogReference(INTERNAL); //Read battery status
-    
-
-}
+ }
 
 void loop () 
 {
@@ -134,11 +151,13 @@ void loop ()
     
     DateTime now = RTC.now(); //get the current date-time    
     prevMinute = now.minute();
-   
+    digitalWrite(BEE_PWRPIN,HIGH); //turn on Bee port  
     gprsbee.on();
-    bool smsSent = gprsbee.sendSMS(TELNO,"Temp");
+    bool smsSent = gprsbee.sendSMS(TELNO,temperatureS.c_str()); //String.c_str() send Char array of String
     gprsbee.off();      
-    gprsbee.off();   
+    //gprsbee.off();  
+    digitalWrite(BEE_PWRPIN,HIGH); //turn on Bee port  
+    
     RTC.clearINTStatus(); //This function call is  a must to bring /INT pin HIGH after an interrupt.
     RTC.enableInterrupts(interruptTime.hour(),interruptTime.minute(),interruptTime.second());    // set the interrupt at (h,m,s)
     attachInterrupt(0, INT0_ISR, LOW);  //Enable INT0 interrupt (as ISR disables interrupt). This strategy is required to handle LEVEL triggered interrupt

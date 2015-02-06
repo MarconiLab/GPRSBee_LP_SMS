@@ -9,7 +9,7 @@
  *
  * Uncomment or make it a #undef
  */
-#undef ENABLE_DIAG     1
+#define ENABLE_DIAG     1
 
 #ifdef ENABLE_DIAG
 extern SoftwareSerial diagport;
